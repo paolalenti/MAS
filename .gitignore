@@ -1,0 +1,49 @@
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Environment ---
+.env
+.env.*
+*.env
+
+# --- Dependencies ---
+node_modules/
+venv/
+.env/
+.venv/
+
+# --- Build / Dist ---
+dist/
+build/
+out/
+*.egg-info/
+*.egg
+*.pyc
+__pycache__/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Coverage ---
+coverage/
+htmlcov/
+.coverage
+.cache/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Misc ---
+*.sqlite3
+*.db
