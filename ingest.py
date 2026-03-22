@@ -4,15 +4,28 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
+from pathlib import Path
 
-# Настройки
+
 KB_PATH = "./knowledge_base"
 QDRANT_URL = "http://localhost:6333"
 COLLECTION_NAME = "edu_docs"
+DOC_TYPE_MAP = {
+    "style": "style_guide",
+    "docker": "docker_docs",
+}
+
+
+def detect_doc_type(file_path: str) -> str:
+    """Определяет тип документа по пути к файлу."""
+    path_lower = file_path.lower()
+    for keyword, doc_type in DOC_TYPE_MAP.items():
+        if keyword in path_lower:
+            return doc_type
+    return "general"
 
 
 def run_ingestion():
-    # 1. Загружаем документы
     loader = DirectoryLoader(
         KB_PATH,
         glob="**/*.md",
@@ -21,11 +34,14 @@ def run_ingestion():
     )
     docs = loader.load()
 
-    # 2. Разбиваем на части (Chunking)
+    for doc in docs:
+        source_path = doc.metadata.get("source", "")
+        doc.metadata["doc_type"] = detect_doc_type(source_path)
+        doc.metadata["filename"] = Path(source_path).name
+
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     splits = text_splitter.split_documents(docs)
 
-    # 3. Эмбеддинги (локальная модель)
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
     client = QdrantClient(url=QDRANT_URL)
