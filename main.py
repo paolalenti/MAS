@@ -1,6 +1,9 @@
 from fastapi import FastAPI, HTTPException
+from langchain_core.messages import AIMessage
 from pydantic import BaseModel
 import uvicorn
+import asyncio
+from functools import partial
 
 from core import app as langgraph_app
 
@@ -20,16 +23,29 @@ async def generate_course(request: CourseRequest):
             "messages": [],
             "course_plan": [],
             "current_content": "",
+            "quiz": {},
             "user_score": 0
         }
 
-        result = langgraph_app.invoke(initial_state)
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            partial(langgraph_app.invoke, initial_state)
+        )
+
+        content = result.get("current_content", "")
+        if not content:
+            for msg in reversed(result.get("messages", [])):
+                if isinstance(msg, AIMessage) and not msg.tool_calls and msg.content:
+                    content = msg.content
+                    break
 
         return {
             "status": "success",
             "topic": request.topic,
             "plan": result.get("course_plan", []),
-            "content": result.get("current_content", "")
+            "content": content,
+            "quiz": result.get("quiz", {})
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
