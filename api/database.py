@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, ForeignKey
+from sqlalchemy import create_engine, ForeignKey, ARRAY, String
 from sqlalchemy.orm import sessionmaker, declarative_base, mapped_column, Mapped
 
 Base = declarative_base()
@@ -32,7 +32,7 @@ class Question(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     module_id: Mapped[int] = mapped_column(ForeignKey('modules.id'), index=True)
     question_text: Mapped[str] = mapped_column()
-    options: Mapped[list[str]] = mapped_column()
+    options: Mapped[list[str]] = mapped_column(ARRAY(String))
     answer: Mapped[int] = mapped_column()
 
 

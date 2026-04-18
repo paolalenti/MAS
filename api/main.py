@@ -6,7 +6,6 @@ import asyncio
 from functools import partial
 
 from core import app as langgraph_app
-from ingest import run_ingestion
 from database import Base, engine
 
 api = FastAPI(title="AI Edu-Content Studio API")
@@ -53,7 +52,6 @@ async def generate_course(request: CourseRequest):
 
 
 if __name__ == "__main__":
-    run_ingestion()
     Base.metadata.create_all(engine)
     print("Запуск API сервера на http://localhost:8000")
     uvicorn.run(api, host="0.0.0.0", port=8000)
