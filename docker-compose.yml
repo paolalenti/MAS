@@ -1,7 +1,7 @@
 services:
   ollama:
     image: ollama/ollama:latest
-    container_name: ollama
+    container_name: multiagent_ollama
     ports:
       - "11434:11434"
     volumes:
@@ -15,7 +15,7 @@ services:
 
   phoenix:
     image: arizephoenix/phoenix:latest
-    container_name: phoenix
+    container_name: multiagent_phoenix
     ports:
       - "6006:6006"
       - "4317:4317"
@@ -23,16 +23,21 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    container_name: postgres
+    container_name: multiagent_postgres
     environment:
-      POSTGRES_USER: edu_user
-      POSTGRES_PASSWORD: edu_password
-      POSTGRES_DB: edu_memory
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: always
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -43,6 +48,29 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
     restart: always
+
+  api:
+    build: ./api
+    container_name: multiagent_api
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - PHOENIX_URL=http://phoenix:4317
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_COLLECTION=${QDRANT_COLLECTION}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+    depends_on:
+      ollama:
+        condition: service_started
+      phoenix:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
 
 volumes:
   ollama_data:

@@ -1,8 +1,12 @@
 import os
 from phoenix.otel import register
 
-phoenix_endpoint = os.getenv("PHOENIX_COLLECTOR_ENDPOINT", "http://localhost:4317")
-register(endpoint=phoenix_endpoint)
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+PHOENIX_URL = os.getenv("PHOENIX_URL", "http://localhost:4317")
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "edu_docs")
+
+register(endpoint=PHOENIX_URL)
 
 from openinference.instrumentation.langchain import LangChainInstrumentor
 
@@ -22,10 +26,6 @@ from langchain_core.messages import SystemMessage, ToolMessage, AIMessage
 from qdrant_client import QdrantClient
 
 from system_prompts import *
-
-
-QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
-COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "edu_docs")
 
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
@@ -52,10 +52,14 @@ class AgentState(TypedDict):
     tool_call_count: int
 
 
-# llm = ChatOllama(model="llama3.1:8b", temperature=0.7) # Требует большего количества RAM
-# llm = ChatOllama(model="llama3.2:3b", temperature=0.7) # Слишком глупая и не вызывает инструменты
-llm = ChatOllama(model="qwen2.5:7b", temperature=0.7) # За 4m10s вернула удовлетворительный ответ
-# llm = ChatOllama(model="qwen3:4b", temperature=0.7) # Не проверял
+llm = ChatOllama(
+    # model="llama3.1:8b",  # Требует большего количества RAM
+    # model="llama3.2:3b",  # Слишком глупая и не вызывает инструменты
+    model="qwen2.5:7b",  # За 4m10s вернула удовлетворительный ответ
+    # model="qwen3:4b",  # Не проверял
+    base_url=OLLAMA_URL,
+    temperature=0.7
+)
 
 
 def architect_node(state: AgentState):

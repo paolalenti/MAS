@@ -21,6 +21,8 @@ def get_title(filepath: str) -> str:
 
 
 def run_ingestion():
+    print("Загрузка чанков...")
+
     loader = DirectoryLoader(
         KB_PATH,
         glob="**/*.md",
