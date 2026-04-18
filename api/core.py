@@ -1,10 +1,13 @@
 import os
 from phoenix.otel import register
 
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+PHOENIX_URL = os.getenv("PHOENIX_URL", "http://localhost:4317")
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "edu_docs")
 
-os.environ["PHOENIX_COLLECTOR_ENDPOINT"] = "http://localhost:4317"
+register(endpoint=PHOENIX_URL)
 
-register()
 from openinference.instrumentation.langchain import LangChainInstrumentor
 
 if not LangChainInstrumentor().is_instrumented_by_opentelemetry:
@@ -22,9 +25,7 @@ from langchain.tools import tool
 from langchain_core.messages import SystemMessage, ToolMessage, AIMessage
 from qdrant_client import QdrantClient
 
-
-QDRANT_URL = "http://localhost:6333"
-COLLECTION_NAME = "edu_docs"
+from system_prompts import *
 
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
@@ -35,18 +36,9 @@ vector_store = QdrantVectorStore(
     embedding=embeddings,
 )
 
-style_retriever = vector_store.as_retriever(
-    search_kwargs={
-        "k": 3,
-        "filter": {"must": [{"key": "metadata.doc_type", "match": {"value": "style_guide"}}]}
-    }
-)
-
-docker_retriever = vector_store.as_retriever(
-    search_kwargs={
-        "k": 3,
-        "filter": {"must": [{"key": "metadata.doc_type", "match": {"value": "docker_docs"}}]}
-    }
+knowledge_retriever = vector_store.as_retriever(
+    search_type="similarity_score_threshold",
+    search_kwargs={"score_threshold": 0.75}
 )
 
 
@@ -60,27 +52,25 @@ class AgentState(TypedDict):
     tool_call_count: int
 
 
-# llm = ChatOllama(model="llama3.1:8b", temperature=0.7) # Требует большего количества RAM
-# llm = ChatOllama(model="llama3.2:3b", temperature=0.7) # Слишком глупая и не вызывает инструменты
-llm = ChatOllama(model="qwen2.5:7b", temperature=0.7) # За 4m10s вернула удовлетворительный ответ
-# llm = ChatOllama(model="qwen3:4b", temperature=0.7) # Не проверял
+llm = ChatOllama(
+    # model="llama3.1:8b",  # Требует большего количества RAM
+    # model="llama3.2:3b",  # Слишком глупая и не вызывает инструменты
+    model="qwen2.5:7b",  # За 4m10s вернула удовлетворительный ответ
+    # model="qwen3:4b",  # Не проверял
+    base_url=OLLAMA_URL,
+    temperature=0.7
+)
 
 
 def architect_node(state: AgentState):
     topic = state["topic"]
 
-    docs = docker_retriever.invoke(f"{topic} style guide")
+    docs = knowledge_retriever.invoke(f"{topic} style guide")
     context = "\n".join([d.page_content for d in docs])
 
-    prompt = f"""Ты — главный архитектор образовательных программ. 
-    Используй эти правила и знания:
-    {context}
+    system_prompt = get_prompt(architect_prompt, topic=topic, context=context)
 
-    Задача: составь план из 3 модулей по теме: {topic}. 
-    Отвечай СТРОГО списком через запятую, без лишних слов. 
-    Модули не должны называться просто цифрой, у них должно быть краткое название."""
-
-    response = llm.invoke(prompt)
+    response = llm.invoke(SystemMessage(content=system_prompt))
     plan = [p.strip() for p in response.content.split(",")]
 
     return {"course_plan": plan, "messages": [response]}
@@ -90,18 +80,8 @@ def content_creator_node(state: AgentState):
     plan = state["course_plan"]
     target_module = plan[0] if plan else state["topic"]
 
-    style_docs = style_retriever.invoke("правила оформления тон эмодзи структура текста")
-    style_context = "\n".join([d.page_content for d in style_docs])
-
-    system_prompt = f"""Ты — технический писатель. Твоя задача: написать текст для раздела '{target_module}'.
-
-    ПРАВИЛА ОФОРМЛЕНИЯ — соблюдай обязательно:
-    {style_context}
-
-    У тебя есть инструменты:
-    - 'search_docker_knowledge' — используй когда нужны технические детали, команды, примеры
-
-    Если уже собрал достаточно информации — напиши финальный текст, соблюдая правила выше."""
+    instruments = "- 'search_knowledge_base' — используй когда нужны технические детали, команды, примеры"
+    system_prompt = get_prompt(content_creator_prompt, module=target_module, instruments=instruments)
 
     all_messages = state["messages"]
 
@@ -128,26 +108,13 @@ def content_creator_node(state: AgentState):
 
 
 def quiz_master_node(state: AgentState):
+    plan = state["course_plan"]
+    target_module = plan[0] if plan else state["topic"]
     content = state["current_content"]
 
-    prompt = f"""Ты — Quiz Master. Твоя задача: составить проверочный тест по следующему тексту:
-        {content}
+    system_prompt = get_prompt(quiz_master_prompt, module=target_module, content=content)
 
-        ТРЕБОВАНИЯ:
-        1. Составь 1 вопрос с 4 вариантами ответа.
-        2. Ответ должен быть СТРОГО в формате JSON.
-        3. Не пиши ничего, кроме JSON.
-        4. Номер правильного ответа пиши в значение ключа "answer"
-
-        ФОРМАТ:
-        {{
-            "question": "Текст вопроса",
-            "options": ["Вариант 1", "Вариант 2", "Вариант 3", "Вариант 4"],
-            "answer": 1-4
-        }}
-        """
-
-    response = llm.invoke(prompt)
+    response = llm.invoke(SystemMessage(content=system_prompt))
 
     try:
         clean_content = response.content.replace("```json", "").replace("```", "").strip()
@@ -159,13 +126,13 @@ def quiz_master_node(state: AgentState):
 
 
 @tool
-def search_docker_knowledge(query: str) -> str:
-    """Ищет технические факты о Docker: команды, концепции, архитектуру, примеры использования."""
-    docs = docker_retriever.invoke(query)
+def search_knowledge_base(query: str) -> str:
+    """Ищет технические факты по запросу или ключевым словам: команды, концепции, архитектуру, примеры использования."""
+    docs = knowledge_retriever.invoke(query)
     return "\n\n".join([d.page_content for d in docs])
 
 
-tools = [search_docker_knowledge]
+tools = [search_knowledge_base]
 tool_node = ToolNode(tools)
 llm_with_tools = llm.bind_tools(tools)
 
