@@ -10,19 +10,13 @@ from pathlib import Path
 KB_PATH = "./knowledge_base"
 QDRANT_URL = "http://localhost:6333"
 COLLECTION_NAME = "edu_docs"
-DOC_TYPE_MAP = {
-    "style": "style_guide",
-    "docker": "docker_docs",
-}
 
 
-def detect_doc_type(file_path: str) -> str:
-    """Определяет тип документа по пути к файлу."""
-    path_lower = file_path.lower()
-    for keyword, doc_type in DOC_TYPE_MAP.items():
-        if keyword in path_lower:
-            return doc_type
-    return "general"
+def get_title(filepath: str) -> str:
+    """Получает заголовок .md файла"""
+    try: line = open(filepath).readline().strip()
+    except Exception: return ""
+    return line[2:].strip() if line.startswith("# ") else ""
 
 
 def run_ingestion():
@@ -36,7 +30,7 @@ def run_ingestion():
 
     for doc in docs:
         source_path = doc.metadata.get("source", "")
-        doc.metadata["doc_type"] = detect_doc_type(source_path)
+        doc.metadata["title"] = get_title(source_path)
         doc.metadata["filename"] = Path(source_path).name
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
