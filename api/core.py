@@ -70,7 +70,7 @@ def architect_node(state: AgentState):
 
     system_prompt = get_prompt(architect_prompt, topic=topic, context=context)
 
-    response = llm.invoke(SystemMessage(content=system_prompt))
+    response = llm.invoke([SystemMessage(content=system_prompt)])
     plan = [p.strip() for p in response.content.split(",")]
 
     return {"course_plan": plan, "messages": [response]}
@@ -114,7 +114,7 @@ def quiz_master_node(state: AgentState):
 
     system_prompt = get_prompt(quiz_master_prompt, module=target_module, content=content)
 
-    response = llm.invoke(SystemMessage(content=system_prompt))
+    response = llm.invoke([SystemMessage(content=system_prompt)])
 
     try:
         clean_content = response.content.replace("```json", "").replace("```", "").strip()
