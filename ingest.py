@@ -1,3 +1,4 @@
+import os
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -8,8 +9,8 @@ from pathlib import Path
 
 
 KB_PATH = "./knowledge_base"
-QDRANT_URL = "http://localhost:6333"
-COLLECTION_NAME = "edu_docs"
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "edu_docs")
 
 
 def get_title(filepath: str) -> str:

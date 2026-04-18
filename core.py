@@ -1,10 +1,9 @@
 import os
 from phoenix.otel import register
 
+phoenix_endpoint = os.getenv("PHOENIX_COLLECTOR_ENDPOINT", "http://localhost:4317")
+register(endpoint=phoenix_endpoint)
 
-os.environ["PHOENIX_COLLECTOR_ENDPOINT"] = "http://localhost:4317"
-
-register()
 from openinference.instrumentation.langchain import LangChainInstrumentor
 
 if not LangChainInstrumentor().is_instrumented_by_opentelemetry:
@@ -25,8 +24,8 @@ from qdrant_client import QdrantClient
 from system_prompts import *
 
 
-QDRANT_URL = "http://localhost:6333"
-COLLECTION_NAME = "edu_docs"
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "edu_docs")
 
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
