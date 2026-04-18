@@ -1,7 +1,7 @@
 services:
   ollama:
     image: ollama/ollama:latest
-    container_name: multiagent_ollama
+    container_name: mas_ollama
     ports:
       - "11434:11434"
     volumes:
@@ -15,7 +15,7 @@ services:
 
   phoenix:
     image: arizephoenix/phoenix:latest
-    container_name: multiagent_phoenix
+    container_name: mas_phoenix
     ports:
       - "6006:6006"
       - "4317:4317"
@@ -23,7 +23,7 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    container_name: multiagent_postgres
+    container_name: mas_postgres
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -41,7 +41,7 @@ services:
 
   qdrant:
     image: qdrant/qdrant:latest
-    container_name: qdrant
+    container_name: mas_qdrant
     ports:
       - "6333:6333" # HTTP API
       - "6334:6334" # gRPC API
@@ -51,7 +51,7 @@ services:
 
   api:
     build: ./api
-    container_name: multiagent_api
+    container_name: mas_api
     environment:
       - OLLAMA_URL=http://ollama:11434
       - PHOENIX_URL=http://phoenix:4317
