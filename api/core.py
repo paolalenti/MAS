@@ -37,8 +37,9 @@ vector_store = QdrantVectorStore(
 )
 
 knowledge_retriever = vector_store.as_retriever(
-    search_type="similarity_score_threshold",
-    search_kwargs={"score_threshold": 0.75}
+    # search_type="similarity", search_kwargs={"k": 10}
+    # search_type="similarity_score_threshold", search_kwargs={"score_threshold": 0.5}
+    search_type="mmr", search_kwargs={"k": 10, "fetch_k": 30}
 )
 
 
@@ -65,7 +66,7 @@ llm = ChatOllama(
 def architect_node(state: AgentState):
     topic = state["topic"]
 
-    docs = knowledge_retriever.invoke(f"{topic} style guide")
+    docs = knowledge_retriever.invoke(topic)
     context = "\n".join([d.page_content for d in docs])
 
     system_prompt = get_prompt(architect_prompt, topic=topic, context=context)
