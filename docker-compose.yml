@@ -9,8 +9,13 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4'
-          memory: 8192M
+          cpus: '16'
+          memory: 16484M
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
     restart: always
 
   phoenix:

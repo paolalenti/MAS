@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, ForeignKey, ARRAY, String
+from sqlalchemy import create_engine, ForeignKey, ARRAY, String, Text
 from sqlalchemy.orm import sessionmaker, declarative_base, mapped_column, Mapped
 
 Base = declarative_base()
@@ -24,6 +24,7 @@ class Module(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     course_id: Mapped[int] = mapped_column(ForeignKey('courses.id'), index=True)
     topic: Mapped[str] = mapped_column()
+    content: Mapped[str] = mapped_column(Text, nullable=True)
     completed: Mapped[bool] = mapped_column(default=False)
 
 
