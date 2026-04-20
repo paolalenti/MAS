@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, delete
@@ -123,9 +124,14 @@ async def generate_course(request: CourseRequest, user_id: str):
             "topic": request.topic,
             "messages": [],
             "course_plan": [],
+            "current_module_index": 0,
             "current_content": "",
+            "modules_content": {},
             "quiz": {},
-            "user_score": 0
+            "all_quizzes": {},
+            "user_score": 0,
+            "tool_call_count": 0,
+            "tool_messages_for_current_module": [],
         }
 
         loop = asyncio.get_event_loop()
@@ -134,12 +140,8 @@ async def generate_course(request: CourseRequest, user_id: str):
             partial(langgraph_app.invoke, initial_state)
         )
 
-        content = result.get("current_content", "")
-        if not content:
-            for msg in reversed(result.get("messages", [])):
-                if isinstance(msg, AIMessage) and not msg.tool_calls and msg.content:
-                    content = msg.content
-                    break
+        all_quizzes: dict = result.get("all_quizzes", {})
+        modules_content: dict = result.get("modules_content", {})
 
         with DBSession.begin() as session:
             course = Course(user_id=user_id, topic=request.topic)
@@ -147,26 +149,36 @@ async def generate_course(request: CourseRequest, user_id: str):
             session.flush()
 
             for module_topic in result.get("course_plan", []):
-                module = Module(course_id=course.id, topic=module_topic)
+                module = Module(
+                    course_id=course.id,
+                    topic=module_topic,
+                    content=modules_content.get(module_topic, ""),  # FIX: сохраняем контент модуля
+                )
                 session.add(module)
                 session.flush()
 
-                for q in result.get("quiz", {}).get(module_topic, []):
-                    question = Question(
+                questions = all_quizzes.get(module_topic, [])
+
+                if not isinstance(questions, list):
+                    continue
+
+                session.add_all([
+                    Question(
                         module_id=module.id,
                         question_text=q["question"],
                         options=q["options"],
                         answer=q["answer"],
                     )
-                    session.add(question)
+                    for q in questions
+                    if {"question", "options", "answer"} <= q.keys()
+                ])
 
         return {
             "status": "success",
-            "topic": request.topic,
-            "plan": result.get("course_plan", []),
-            "content": content,
-            "quiz": result.get("quiz", {})
+            "id": course.id,
+            "topic": request.topic
         }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -189,10 +201,13 @@ def list_modules(user_id: int, course_id: int, db: Session = Depends(get_db)):
 def get_module(user_id: int, course_id: int, module_id: int, db: Session = Depends(get_db)):
     course = get_course_for_user(course_id, user_id, db)
     module = get_module_for_course(module_id, course, db)
+    content = module["content"]
+
     return {
         "id": module.id,
         "course_id": module.course_id,
         "topic": module.topic,
+        "content": content,
         "completed": module.completed,
     }
 
