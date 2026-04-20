@@ -147,16 +147,20 @@ async def generate_course(request: CourseRequest, user_id: str):
             course = Course(user_id=user_id, topic=request.topic)
             session.add(course)
             session.flush()
+            course_id = course.id
 
-            for module_topic in result.get("course_plan", []):
-                module = Module(
-                    course_id=course.id,
+            modules = {
+                module_topic: Module(
+                    course_id=course_id,
                     topic=module_topic,
                     content=modules_content.get(module_topic, ""),  # FIX: сохраняем контент модуля
                 )
-                session.add(module)
-                session.flush()
+                for module_topic in result.get("course_plan", [])
+            }
+            session.add_all(modules.values())
+            session.flush()
 
+            for module_topic in result.get("course_plan", []):
                 questions = all_quizzes.get(module_topic, [])
 
                 if not isinstance(questions, list):
@@ -164,7 +168,7 @@ async def generate_course(request: CourseRequest, user_id: str):
 
                 session.add_all([
                     Question(
-                        module_id=module.id,
+                        module_id=modules[module_topic].id,
                         question_text=q["question"],
                         options=q["options"],
                         answer=q["answer"],
@@ -175,7 +179,7 @@ async def generate_course(request: CourseRequest, user_id: str):
 
         return {
             "status": "success",
-            "id": course.id,
+            "id": course_id,
             "topic": request.topic
         }
 
@@ -201,13 +205,12 @@ def list_modules(user_id: int, course_id: int, db: Session = Depends(get_db)):
 def get_module(user_id: int, course_id: int, module_id: int, db: Session = Depends(get_db)):
     course = get_course_for_user(course_id, user_id, db)
     module = get_module_for_course(module_id, course, db)
-    content = module["content"]
 
     return {
         "id": module.id,
         "course_id": module.course_id,
         "topic": module.topic,
-        "content": content,
+        "content": module.content,
         "completed": module.completed,
     }
 
