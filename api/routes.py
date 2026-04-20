@@ -175,10 +175,8 @@ async def generate_course(request: CourseRequest, user_id: str):
 
         return {
             "status": "success",
-            "topic": request.topic,
-            "plan": result.get("course_plan", []),
-            "modules_content": modules_content,
-            "quizzes": all_quizzes,
+            "id": course.id,
+            "topic": request.topic
         }
 
     except Exception as e:
