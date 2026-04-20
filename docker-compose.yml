@@ -1,11 +1,9 @@
 services:
   ollama:
-    image: ollama/ollama:latest
+    build: ./ollama
     container_name: mas_ollama
     ports:
       - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
     deploy:
       resources:
         limits:
@@ -21,9 +19,13 @@ services:
   phoenix:
     image: arizephoenix/phoenix:latest
     container_name: mas_phoenix
+    environment:
+      - PHOENIX_WORKING_DIR=/root/.arize-phoenix
     ports:
       - "6006:6006"
       - "4317:4317"
+    volumes:
+      - phoenix_data:/root/.arize-phoenix
     restart: always
 
   postgres:
@@ -124,7 +126,7 @@ services:
       - loki
 
 volumes:
-  ollama_data:
+  phoenix_data:
   postgres_data:
   qdrant_data:
   grafana_data:
